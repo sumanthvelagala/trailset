@@ -27,7 +27,7 @@ Return JSON only:
 {{"vibe_match": 4.0, "relevance": 3.5}}
 """
 
-    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-3.5-flash-lite", contents=prompt)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]

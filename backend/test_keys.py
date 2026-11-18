@@ -10,7 +10,7 @@ def test_gemini():
     from google import genai
     client = genai.Client(api_key=os.getenv("GOOGLE_AI_API_KEY"))
     response = client.models.generate_content(
-        model="gemini-3.8-flash",
+        model="gemini-3.5-flash-lite",
         contents="Say 'Gemini OK' and nothing else.",
     )
     print(f"  Gemini:    {response.text.strip()}")
@@ -43,7 +43,7 @@ async def test_nominatim():
 if __name__ == "__main__":
     print("\nTesting API keys...\n")
 
-    print("[1] Gemini 2.5 Flash")
+    print("[1] Gemini 3.5 Flash Lite")
     try:
         test_gemini()
     except Exception as e:

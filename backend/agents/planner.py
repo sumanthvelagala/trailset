@@ -60,7 +60,7 @@ Return a JSON array of stops:
 Return JSON only, no markdown.
 """
 
-    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-3.5-flash-lite", contents=prompt)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
