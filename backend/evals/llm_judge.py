@@ -1,12 +1,11 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
 from models import Stop, TripRequest
 
 
 async def run_llm_evals(request: TripRequest, stops: list[Stop]) -> dict:
-    genai.configure(api_key=os.getenv("GOOGLE_AI_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=os.getenv("GOOGLE_AI_API_KEY"))
 
     stops_summary = "\n".join(
         f"- {s.name} ({s.type}): {s.vibe_reason}" for s in stops
@@ -28,7 +27,7 @@ Return JSON only:
 {{"vibe_match": 4.0, "relevance": 3.5}}
 """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]

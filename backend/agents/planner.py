@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 from dataclasses import dataclass
-import google.generativeai as genai
+from google import genai
 
 from models import Candidate, Stop
 from utils.geocode import geocode
@@ -24,8 +24,7 @@ class PlannerResult:
 
 
 async def run_planner(request, candidates: list[Candidate]) -> PlannerResult:
-    genai.configure(api_key=os.getenv("GOOGLE_AI_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=os.getenv("GOOGLE_AI_API_KEY"))
 
     candidates_json = json.dumps([c.model_dump() for c in candidates], indent=2)
 
@@ -61,7 +60,7 @@ Return a JSON array of stops:
 Return JSON only, no markdown.
 """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -69,7 +68,7 @@ Return JSON only, no markdown.
             text = text[4:]
 
     data = json.loads(text)
-    tokens = response.usage_metadata.total_token_count if hasattr(response, "usage_metadata") else 0
+    tokens = response.usage_metadata.total_token_count if response.usage_metadata else 0
 
     # Geocode all stops in parallel
     coords = await asyncio.gather(*[geocode(s["name"], request.city) for s in data])

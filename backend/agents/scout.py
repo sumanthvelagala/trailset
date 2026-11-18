@@ -1,9 +1,8 @@
 import asyncio
 import os
-import time
 from dataclasses import dataclass
 from tavily import AsyncTavilyClient
-import google.generativeai as genai
+from google import genai
 import json
 
 from models import Candidate
@@ -35,8 +34,7 @@ async def run_scout(request) -> ScoutResult:
         f"- {r['title']}: {r['content'][:200]}" for r in activity_results.get("results", [])
     )
 
-    genai.configure(api_key=os.getenv("GOOGLE_AI_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=os.getenv("GOOGLE_AI_API_KEY"))
 
     prompt = f"""
 You are a local travel scout. Based on the search results below, extract 8-10 real candidate places for a day trip.
@@ -63,7 +61,7 @@ Return a JSON array of candidates. Each item:
 Only include places actually in {request.city}. Keep est_cost realistic. Return JSON only, no markdown.
 """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
     text = response.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -72,6 +70,6 @@ Only include places actually in {request.city}. Keep est_cost realistic. Return 
 
     data = json.loads(text)
     candidates = [Candidate(**item) for item in data]
-    tokens = response.usage_metadata.total_token_count if hasattr(response, "usage_metadata") else 0
+    tokens = response.usage_metadata.total_token_count if response.usage_metadata else 0
 
     return ScoutResult(candidates=candidates, searches_used=2, tokens=tokens)
