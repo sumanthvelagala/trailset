@@ -1,37 +1,67 @@
 import os
-import json
+import asyncio
+from pydantic import BaseModel
 from google import genai
-from models import Stop, TripRequest
+from google.genai import types, errors
+
+from config import GEMINI_MODEL
+
+FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 
-async def run_llm_evals(request: TripRequest, stops: list[Stop]) -> dict:
-    client = genai.Client(api_key=os.getenv("GOOGLE_AI_API_KEY"))
+class JudgeScores(BaseModel):
+    vibe_match: float       # 1-5: does itinerary match the user's vibe?
+    relevance: float        # 1-5: are places local and non-touristy?
+    reasoning: str          # one sentence explaining the scores
+
+
+async def _generate_with_retry(client, **kwargs):
+    for attempt in range(4):
+        if attempt == 2:
+            kwargs = {**kwargs, "model": FALLBACK_MODEL}
+        try:
+            return await client.aio.models.generate_content(**kwargs)
+        except errors.ServerError:
+            if attempt == 3:
+                raise
+            await asyncio.sleep(2 ** (attempt % 2))
+
+
+async def run_llm_evals(state: dict) -> dict:
+    stops = state.get("stops", [])
+    vibe = state.get("vibe", "")
 
     stops_summary = "\n".join(
-        f"- {s.name} ({s.type}): {s.vibe_reason}" for s in stops
+        f"- {s['name']} ({s['type']}, {s.get('neighborhood', '')}): {s.get('reason', '')}"
+        for s in stops
     )
 
-    prompt = f"""
-You are evaluating a day-trip itinerary. Score each criterion from 1.0 to 5.0.
+    prompt = f"""Evaluate this day-trip itinerary.
 
-User vibe: "{request.vibe}"
+User vibe: "{vibe}"
 
-Itinerary stops:
+Itinerary:
 {stops_summary}
 
-Score these two criteria:
-1. vibe_match: Does the itinerary genuinely match the user's vibe? (1=not at all, 5=perfect match)
-2. relevance: Are these places actually local and non-touristy (not generic chains or obvious tourist traps)? (1=very generic, 5=very local/authentic)
-
-Return JSON only:
-{{"vibe_match": 4.0, "relevance": 3.5}}
+Score vibe_match (1-5): does the itinerary genuinely match the user's vibe?
+Score relevance (1-5): are these places actually local and non-touristy (not chains or obvious tourist traps)?
+Add one sentence of reasoning.
 """
 
-    response = client.models.generate_content(model="gemini-3.5-flash-lite", contents=prompt)
-    text = response.text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
+    client = genai.Client(api_key=os.getenv("GOOGLE_AI_API_KEY"))
+    response = await _generate_with_retry(
+        client,
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=JudgeScores,
+        ),
+    )
 
-    return json.loads(text)
+    parsed: JudgeScores = response.parsed
+    return {
+        "vibe_match": parsed.vibe_match,
+        "relevance": parsed.relevance,
+        "reasoning": parsed.reasoning,
+    }

@@ -4,6 +4,7 @@ from state import TripState
 from nodes.scout import scout_node
 from nodes.enrich import enrich_node
 from nodes.planner import planner_node
+from nodes.eval import eval_node
 from config import MAX_SCOUT_RETRIES, MAX_PLANNER_RETRIES
 
 
@@ -93,8 +94,8 @@ def build_graph():
     graph.add_node("enrich", enrich_node)
     graph.add_node("planner", planner_node)
     graph.add_node("retry_planner", retry_planner_node)
+    graph.add_node("eval", eval_node)
     graph.add_node("failed", error_node)
-    # eval node added in Day 5
 
     graph.set_entry_point("scout")
 
@@ -104,7 +105,7 @@ def build_graph():
         "error": "failed",
     })
     graph.add_conditional_edges("planner", validate_planner, {
-        "eval": END,           # temporary until eval is added
+        "eval": "eval",
         "retry_planner": "retry_planner",
         "error": "failed",
     })
@@ -112,6 +113,7 @@ def build_graph():
     graph.add_edge("retry_scout", "scout")
     graph.add_edge("enrich", "planner")
     graph.add_edge("retry_planner", "planner")
+    graph.add_edge("eval", END)
     graph.add_edge("failed", END)
 
     return graph.compile()
