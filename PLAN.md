@@ -6,15 +6,22 @@
 
 ## Product
 
-**Input:** City · Date · Budget (slider $20-$200) · Vibe (tag chips)
+**Input:** City · Date · Budget (slider $20-$200) · Vibe (tag chips + optional free text) · Starting location (optional)
 **Output:** Timed itinerary cards + map with pins + budget bar + dev panel
 
 **Example:**
 ```
-City:   Austin
-Date:   Saturday, Nov 22
-Budget: $100
-Vibe:   [outdoors] [coffee] [local eats]
+City:    Austin
+Date:    Saturday, Nov 22
+Budget:  $100
+Vibe:    [outdoors] [coffee] [local eats]
+         "no tourist traps, dog friendly"   ← optional, max 100 chars
+```
+
+**What gets sent to agents:**
+```python
+vibe = "outdoors, coffee, local eats. no tourist traps, dog friendly"
+# tags first, free text appended after period
 ```
 
 ---
@@ -23,40 +30,66 @@ Vibe:   [outdoors] [coffee] [local eats]
 
 Graph flow:
 ```
-START → scout_node → planner_node → eval_node → END
+START → scout_node → enrich_node → planner_node → eval_node → END
 ```
 
 Shared state passed through the graph:
 ```python
 TripState = {
   "city", "date", "budget", "vibe",   # input
-  "candidates",                         # scout output
-  "stops",                              # planner output
+  "start_location",                     # optional — e.g. "downtown Austin hotel"
+  "start_coords",                       # geocoded from start_location
+  "candidates",                         # scout output (8-10 candidates with est_cost + cost_verified)
+  "enriched_candidates",                # enrich output (candidates + lat/lng)
+  "stops",                              # planner output (final 4-5 stops with schedule)
   "eval_scores",                        # eval output
   "trajectory",                         # each node's log
 }
 ```
 
 ### scout_node — Agentic (tool calling)
-- Gemini uses `search(query)` as a tool (Tavily)
+- Model: `gemini-3.5-flash-lite`
+- System prompt: defines role, tool description, query format rules, grounding rules
+- Gemini uses `search_places(query)` as a tool (Tavily)
 - LLM decides what to search, how many times (up to MAX_TAVILY_SEARCHES=4), when to stop
-- Interprets vibe to write its own search queries
-- Returns 8-10 candidates: name, type, neighborhood, est_cost, description
-- Logs to trajectory: queries used, candidates returned, latency, tokens
+- Query format guided by system prompt:
+  - Must include: city + specific place type + vibe keywords + "local/hidden/authentic"
+  - Split food and activities into separate searches
+  - e.g. "Austin independent coffee shops South Congress locals love"
+- 2-phase output:
+  - Phase 1: agentic tool calling loop (LLM writes queries, searches freely, decides when done)
+  - Phase 2: grounded extraction — all search results bundled explicitly, LLM returns JSON
+    using ONLY places from those results (prevents hallucination)
+- Structured output via `response_schema=CandidateList` (Pydantic, no manual JSON parsing)
+- Returns 8-10 candidates intentionally exceeding budget — pool for planner to pick from
+- Each candidate: name, type, neighborhood, est_cost (from search text or defaults), description
+- est_cost defaults: coffee=$6, food=$15, outdoor_activity=$5, park=$0, market=$10
+- Logs to trajectory: queries used, results per query, raw_search_results (for grounding checks), candidates returned, latency, tokens
+
+### enrich_node — Geocoding (Nominatim)
+- No LLM calls — pure deterministic pre-processing step
+- Geocodes all 8-10 scout candidates concurrently via Nominatim (OpenStreetMap, free, no key)
+- Also geocodes `start_location` if the user provided one
+- Adds `lat`, `lng` to each candidate so planner can reason about geography before routing
+- Planner needs coordinates upfront to pick geographically sensible stops before calling HERE
+- Note: Google Search grounding (hours/prices) dropped — requires paid Gemini plan
+- Prices come from scout's LLM estimation with `cost_verified` flag
 
 ### planner_node — Agentic (tool calling)
-- Gemini uses two tools:
-  - `geocode(place_name, city)` → lat/lng (Nominatim)
+- Model: `gemini-3.5-flash-lite`
+- Receives enriched candidates: lat/lng + est_cost + cost_verified already attached
+- If start_coords provided, routes from user's starting location to first stop
+- Gemini uses one tool:
   - `travel_time(lat1, lng1, lat2, lng2, departure_time, mode)` → minutes (HERE API)
 - Transport mode auto-selected by distance:
   - < 0.5 miles → walking (HERE pedestrian mode)
   - >= 0.5 miles → driving (HERE car mode)
 - departure_time passed so HERE returns traffic-aware estimates for that day/time
-- LLM picks 4-5 stops, geocodes them, calculates travel legs, assigns start times
+- LLM picks 4-5 open stops, calculates travel legs between them, assigns start times
 - Validates: total cost <= budget, schedule fits 9am-7pm window
 - Assigns dwell times by place type:
   - Coffee → 35 min · Food → 50 min · Park/outdoor → 100 min · Market → 35 min
-- Logs to trajectory: stops selected, budget used, latency, tokens
+- Logs to trajectory: stops selected, budget used, travel legs, latency, tokens
 
 ### eval_node
 - Runs rule-based + LLM-as-judge evals on final stops
@@ -190,7 +223,8 @@ Using `slowapi` + Upstash Redis (persists across Render restarts):
 | UI components | shadcn/ui + Tailwind | Yes |
 | Backend | FastAPI → Render.com | Yes (sleeps after 15 min) |
 | Agent orchestration | LangGraph | Yes |
-| AI | Gemini 3.5 Flash Lite (Google AI Studio) | Yes (1500 req/day) |
+| AI (scout/planner/eval) | Gemini 3.5 Flash Lite (Google AI Studio) | Yes (1500 req/day) |
+| AI (enrichment) | Gemini 2.5 Flash + Google Search grounding | Yes (500 grounding req/day) |
 | Web Search | Tavily | Yes (1000 searches/mo) |
 | Routing | HERE Routing API | Yes (30,000/mo, no credit card) |
 | Geocoding | Nominatim (OpenStreetMap) | Yes, no key |
@@ -207,6 +241,13 @@ Using `slowapi` + Upstash Redis (persists across Render restarts):
 - Date picker
 - Budget slider ($20 - $200)
 - Vibe tag chips: [outdoors] [coffee] [local eats] [art] [nightlife] [family-friendly]
+  - At least 1 tag required
+- Free text input (optional, max 100 chars)
+  - Placeholder: "e.g. no tourist traps, dog friendly, prefer walking"
+  - Live character counter (turns red at 10 remaining)
+- Starting location input (optional)
+  - Placeholder: "e.g. downtown Austin hotel, Austin airport"
+  - Used to route from user's location to first stop
 - Generate button with loading state
 
 ### Results Page (/results)
@@ -230,7 +271,7 @@ Each stop card: name, time slot, dwell time, travel to next (walk/drive + minute
 
 ## Out of Scope (V1)
 
-- Opening hours verification → disclaimer on each card
+- Opening hours verification → NOW IN SCOPE via enrich_node (gemini-2.5-flash + Google Search)
 - User accounts / saved trips
 - Booking links
 - Mobile app
@@ -284,10 +325,10 @@ trailset/
 
 ```
 Day 1   Setup: scaffold, API keys, /health live                              [DONE]
-Day 2   LangGraph: state.py, graph.py, scout_node with Tavily tool calling
-Day 3   planner_node: geocode tool (Nominatim) + routing tool (HERE API)
-Day 4   eval_node: rule-based + LLM-as-judge + full trajectory logging
-Day 5   Golden test set, tool failure handling, per-request caps
+Day 2   LangGraph: state.py, graph.py, scout_node with Tavily tool calling   [DONE]
+Day 3   enrich_node: geocode (Nominatim) + gemini-2.5-flash Google Search (hours + real prices)
+Day 4   planner_node: HERE routing tool (traffic-aware travel times + schedule building)
+Day 5   eval_node: rule-based + LLM-as-judge + trajectory + golden test set
 Day 6   Next.js UI: input form with shadcn/ui (slider, chips, date picker)
 Day 7   Results page: itinerary cards + budget bar
 Day 8   Map view: Leaflet + pins + walk/drive indicators
@@ -299,7 +340,7 @@ Day 10  Dev panel, edge case testing, polish, README
 
 ## API Keys Needed
 
-- `GOOGLE_AI_API_KEY` — Gemini 3.5 Flash Lite (Google AI Studio) [DONE]
+- `GOOGLE_AI_API_KEY` — Gemini 3.5 Flash Lite + Gemini 2.5 Flash (same key) [DONE]
 - `TAVILY_API_KEY` — Tavily search [DONE]
 - `HERE_API_KEY` — HERE Routing API (developer.here.com, free, no credit card)
 - `UPSTASH_REDIS_URL` — Rate limiting (upstash.com, free tier) — add on Day 9
