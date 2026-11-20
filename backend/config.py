@@ -1,4 +1,5 @@
-GEMINI_MODEL            = "gemini-3.5-flash-lite"  # scout, planner, eval
+GEMINI_MODEL            = "gemini-3.5-flash-lite"   # scout, planner, eval (primary)
+GEMINI_FALLBACK_MODEL   = "gemini-3.1-flash-lite"   # fallback on 503
 GEMINI_GROUNDING_MODEL  = "gemini-2.5-flash"        # enrich node (Google Search built-in)
 
 MAX_LANGSEARCH_SEARCHES = 2

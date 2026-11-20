@@ -9,15 +9,13 @@ from google.genai import types, errors
 from state import TripState
 from tools.search import langsearch
 from tools.youtube import youtube_search, _match_sources
-from config import GEMINI_MODEL, MAX_LANGSEARCH_SEARCHES, MAX_YOUTUBE_SEARCHES
-
-FALLBACK_MODEL = "gemini-3.1-flash-lite"
+from config import GEMINI_MODEL, GEMINI_FALLBACK_MODEL, MAX_LANGSEARCH_SEARCHES, MAX_YOUTUBE_SEARCHES
 
 
 async def _generate_with_retry(client, **kwargs):
     for attempt in range(4):
         if attempt == 2:
-            kwargs = {**kwargs, "model": FALLBACK_MODEL}
+            kwargs = {**kwargs, "model": GEMINI_FALLBACK_MODEL}
         try:
             return await client.aio.models.generate_content(**kwargs)
         except errors.ServerError:

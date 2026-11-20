@@ -49,22 +49,25 @@ TripState = {
 
 ### scout_node — Agentic (tool calling)
 - Model: `gemini-3.5-flash-lite`
-- System prompt: defines role, tool description, query format rules, grounding rules
-- Gemini uses `search_places(query)` as a tool (Tavily)
-- LLM decides what to search, how many times (up to MAX_TAVILY_SEARCHES=4), when to stop
-- Query format guided by system prompt:
-  - Must include: city + specific place type + vibe keywords + "local/hidden/authentic"
-  - Split food and activities into separate searches
-  - e.g. "Austin independent coffee shops South Congress locals love"
+- System prompt: defines role, tool descriptions, query format rules, grounding rules
+- Gemini has TWO tools:
+  - `search_places(query)` → Tavily web search (blogs, review sites, local guides)
+  - `youtube_search(query)` → YouTube top 3 videos + transcripts (first 2,500 chars each)
+- LLM decides which tool to call, in what order, up to MAX_TAVILY_SEARCHES=4 + MAX_YOUTUBE_SEARCHES=2
+- Query format:
+  - web: "[city] [place type] [vibe keywords] [local/hidden/authentic]"
+  - youtube: "[city] [vibe] local guide hidden gems [year]"
 - 2-phase output:
-  - Phase 1: agentic tool calling loop (LLM writes queries, searches freely, decides when done)
-  - Phase 2: grounded extraction — all search results bundled explicitly, LLM returns JSON
+  - Phase 1: agentic tool calling loop — LLM uses both tools freely, decides when done
+  - Phase 2: grounded extraction — all web + YouTube results bundled, LLM extracts candidates
     using ONLY places from those results (prevents hallucination)
 - Structured output via `response_schema=CandidateList` (Pydantic, no manual JSON parsing)
 - Returns 8-10 candidates intentionally exceeding budget — pool for planner to pick from
-- Each candidate: name, type, neighborhood, est_cost (from search text or defaults), description
-- est_cost defaults: coffee=$6, food=$15, outdoor_activity=$5, park=$0, market=$10
-- Logs to trajectory: queries used, results per query, raw_search_results (for grounding checks), candidates returned, latency, tokens
+- Each candidate: name, type, neighborhood, est_cost, cost_verified, snippets, image_url, source_videos
+- source_videos: deterministic string match — candidate name words checked against each transcript
+  → if 2+ significant words (>3 chars) found in transcript → video linked to that candidate
+  → shown on stop card as YouTube source links
+- Logs to trajectory: queries used, results per query, raw_search_results, candidates returned, latency, tokens
 
 ### enrich_node — Geocoding (Nominatim)
 - No LLM calls — pure deterministic pre-processing step
@@ -143,7 +146,8 @@ Each node logs:
 
 Hard limits enforced in code per trip generation:
 ```python
-MAX_TAVILY_SEARCHES = 4   # scout tool calls
+MAX_TAVILY_SEARCHES  = 4   # scout web search tool calls
+MAX_YOUTUBE_SEARCHES = 2   # scout youtube search tool calls (3 videos + transcripts each)
 MAX_GEMINI_CALLS    = 4   # scout parse + planner + eval + llm judge
 MAX_GEOCODE_CALLS   = 6   # planner tool calls
 MAX_ROUTE_CALLS     = 5   # planner tool calls

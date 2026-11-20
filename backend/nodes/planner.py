@@ -9,10 +9,9 @@ from google.genai import types, errors
 
 from state import TripState
 from tools.routing import travel_time
-from config import GEMINI_MODEL, MAX_ROUTE_CALLS
+from config import GEMINI_MODEL, GEMINI_FALLBACK_MODEL, MAX_ROUTE_CALLS
 
 
-FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 
 async def _generate_with_retry(client, **kwargs):
@@ -25,7 +24,7 @@ async def _generate_with_retry(client, **kwargs):
     """
     for attempt in range(4):
         if attempt == 2:
-            kwargs = {**kwargs, "model": FALLBACK_MODEL}
+            kwargs = {**kwargs, "model": GEMINI_FALLBACK_MODEL}
         try:
             return await client.aio.models.generate_content(**kwargs)
         except errors.ServerError:
