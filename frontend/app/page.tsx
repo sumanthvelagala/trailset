@@ -1,69 +1,156 @@
+import React from "react";
+import TripForm from "@/components/TripForm";
 import Image from "next/image";
+
+interface PhotoItem {
+  src: string;
+  location: string;
+  state: string;
+  width: number;
+  height: number;
+  rotate: string;
+  pos: string;
+  style?: React.CSSProperties;
+  show: string;
+}
+
+const photos: PhotoItem[] = [
+  // Corners
+  {
+    src: "https://images.unsplash.com/photo-1474044159687-1ee9f3a51722?w=600&q=90",
+    location: "Grand Canyon", state: "AZ",
+    width: 185, height: 225,
+    rotate: "rotate-4",
+    pos: "",
+    style: { top: "10%", left: "20%" },
+    show: "block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=600&q=90",
+    location: "Golden Gate", state: "CA",
+    width: 190, height: 135,
+    rotate: "-rotate-2",
+    pos: "",
+    style: { bottom: "10%", right: "20%" },
+    show: "block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=600&q=90",
+    location: "New York City", state: "NY",
+    width: 150, height: 200,
+    rotate: "-rotate-4",
+    pos: "",
+    style: { top: "-1%", right: "-1%" },
+    show: "hidden lg:block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&q=90",
+    location: "Chicago", state: "IL",
+    width: 205, height: 150,
+    rotate: "rotate-2",
+    pos: "",
+    style: { bottom: "4%", left: "5%" },
+    show: "hidden lg:block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1472396961693-142e6e269027?w=600&q=90",
+    location: "Yosemite", state: "CA",
+    width: 165, height: 215,
+    rotate: "-rotate-3",
+    pos: "",
+    style: { top: "40%", left: "2%" },
+    show: "hidden xl:block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=90",
+    location: "Rocky Mountains", state: "CO",
+    width: 200, height: 140,
+    rotate: "rotate-5",
+    pos: "",
+    style: { bottom: "25%", left: "25%" },
+    show: "hidden xl:block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=600&q=90",
+    location: "New Orleans", state: "LA",
+    width: 180, height: 230,
+    rotate: "rotate-2",
+    pos: "",
+    style: { top: "26%", right: "10%" },
+    show: "hidden xl:block",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1546436836-07a91091f160?w=600&q=90",
+    location: "Manhattan", state: "NY",
+    width: 200, height: 145,
+    rotate: "-rotate-3",
+    pos: "",
+    style: { bottom: "30%", right: "3%" },
+    show: "hidden xl:block",
+  },
+];
+
+function PolaroidPhoto({ photo }: { photo: PhotoItem }) {
+  return (
+    <div
+      className={`pointer-events-none absolute ${photo.pos} ${photo.rotate} ${photo.show}`}
+      style={{ zIndex: 0, ...photo.style }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: "7px 7px 0 7px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.13), 0 1px 6px rgba(0,0,0,0.07)",
+        }}
+      >
+        <div style={{ position: "relative", width: photo.width, height: photo.height }}>
+          <Image
+            src={photo.src}
+            alt={`${photo.location}, ${photo.state}`}
+            fill
+            className="object-cover"
+          />
+        </div>
+        <div className="py-2 px-1 flex items-center gap-1">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="#E8445A" className="shrink-0">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          </svg>
+          <span className="text-xs font-medium text-gray-700 whitespace-nowrap">{photo.location}</span>
+          <span className="text-xs text-gray-400">· {photo.state}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main
+      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 py-16 gap-8"
+      style={{ background: "var(--background)" }}
+    >
+      {/* Scattered polaroid photos — behind everything */}
+      {photos.map((photo) => (
+        <PolaroidPhoto key={`${photo.location}-${photo.state}`} photo={photo} />
+      ))}
+
+      {/* Headline — above form, on top of photos */}
+      <div className="relative z-10 text-center max-w-xl">
+        <h1
+          className="text-5xl font-bold tracking-tight leading-tight mb-3"
+          style={{ color: "var(--foreground)" }}
+        >
+          Where are we<br />wandering?
+        </h1>
+        <p className="text-lg" style={{ color: "var(--muted)" }}>
+          Give us a city, a date, and a budget. We'll stitch together a day that fits your vibe.
+        </p>
+      </div>
+
+      {/* Form card — always on top */}
+      <div className="relative z-10 w-full max-w-xl bg-white rounded-2xl shadow-lg shadow-gray-200/80 px-8 py-10">
+        <TripForm />
+      </div>
+    </main>
   );
 }

@@ -7,51 +7,53 @@ class TripRequest(BaseModel):
     date: str
     budget: float
     vibe: str
+    start_location: Optional[str] = None
 
 
-class Candidate(BaseModel):
-    name: str
-    type: str  # coffee, food, outdoor_activity, park, market
-    neighborhood: str
-    est_cost: float
-    description: str
-
-
-class Stop(BaseModel):
+class StopOut(BaseModel):
     name: str
     type: str
-    address: str
+    neighborhood: str
+    start_time: str
+    end_time: str
+    dwell_minutes: int
+    travel_to_next_minutes: int
+    travel_mode: str
+    est_cost: float
+    cost_verified: bool
     lat: Optional[float] = None
     lng: Optional[float] = None
-    start_time: str
-    dwell_min: int
-    travel_to_next_min: int
-    est_cost: float
-    vibe_reason: str
+    reason: str
+    snippets: list[str] = []
+    source_videos: list[dict] = []
+    source_urls: list[dict] = []
+    image_url: Optional[str] = None
 
 
 class EvalScores(BaseModel):
     budget_ok: bool
-    city_ok: bool
-    schedule_ok: bool
     stop_count_ok: bool
+    schedule_ok: bool
+    scout_coverage_ok: bool
+    has_coords_ok: bool
     vibe_match: Optional[float] = None
     relevance: Optional[float] = None
+    reasoning: Optional[str] = None
+    passed: bool
 
 
 class Observability(BaseModel):
-    scout_latency_ms: int
-    planner_latency_ms: int
     total_latency_ms: int
     tavily_searches: int
-    input_tokens: int
-    output_tokens: int
+    route_calls: int
+    total_tokens: int
     estimated_cost_usd: float
-    eval_scores: EvalScores
+    trajectory: list[dict]
 
 
 class TripResponse(BaseModel):
-    stops: list[Stop]
+    stops: list[StopOut]
     total_cost: float
     budget: float
+    eval_scores: EvalScores
     observability: Observability

@@ -1,7 +1,8 @@
 GEMINI_MODEL            = "gemini-3.5-flash-lite"  # scout, planner, eval
 GEMINI_GROUNDING_MODEL  = "gemini-2.5-flash"        # enrich node (Google Search built-in)
 
-MAX_TAVILY_SEARCHES  = 4
+MAX_LANGSEARCH_SEARCHES = 2
+MAX_YOUTUBE_SEARCHES = 2
 MAX_GEMINI_CALLS     = 4
 MAX_GEOCODE_CALLS    = 6
 MAX_ROUTE_CALLS      = 5

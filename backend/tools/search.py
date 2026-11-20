@@ -1,30 +1,42 @@
 import os
-from tavily import AsyncTavilyClient
+import httpx
 
 
-async def tavily_search(query: str, max_results: int = 5) -> dict:
+async def langsearch(query: str, max_results: int = 5) -> dict:
     """
-    Run a Tavily search and return results + images.
+    Run a LangSearch web search and return results.
     Returns:
       {
         "results": [{"title", "content", "url"}, ...],
-        "images":  ["https://...", ...]   # may be empty
+        "images":  []   # LangSearch doesn't return images
       }
     """
-    client = AsyncTavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    response = await client.search(
-        query,
-        max_results=max_results,
-        search_depth="basic",
-        include_images=True,
-    )
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.langsearch.com/v1/web-search",
+            headers={
+                "Authorization": f"Bearer {os.getenv('LANGSEARCH_API_KEY')}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "query": query,
+                "count": max_results,
+                "contents": {"text": True},
+            },
+            timeout=15,
+        )
+        if response.status_code >= 500:
+            return {"results": [], "images": []}
+        response.raise_for_status()
+        data = response.json()
+
+    pages = data.get("data", {}).get("webPages", {}).get("value", [])
     results = [
         {
-            "title": r["title"],
-            "content": r["content"][:400],
-            "url": r["url"],
+            "title": p["name"],
+            "content": p.get("text", "")[:400],
+            "url": p["url"],
         }
-        for r in response.get("results", [])
+        for p in pages
     ]
-    images = response.get("images", [])
-    return {"results": results, "images": images}
+    return {"results": results, "images": []}

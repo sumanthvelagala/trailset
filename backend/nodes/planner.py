@@ -281,6 +281,19 @@ async def planner_node(state: TripState) -> dict:
     parsed: StopList = final_response.parsed
     stops = [s.model_dump() for s in parsed.stops]
 
+    # Copy source_videos from enriched candidates by name matching
+    candidate_map = {c["name"].lower(): c for c in state.get("enriched_candidates", [])}
+    for stop in stops:
+        name_lower = stop["name"].lower()
+        candidate = candidate_map.get(name_lower)
+        if not candidate:
+            for cname, c in candidate_map.items():
+                if name_lower in cname or cname in name_lower:
+                    candidate = c
+                    break
+        stop["source_videos"] = candidate.get("source_videos", []) if candidate else []
+        stop["source_urls"] = candidate.get("source_urls", []) if candidate else []
+
     latency_ms = int((time.time() - start) * 1000)
 
     return {
